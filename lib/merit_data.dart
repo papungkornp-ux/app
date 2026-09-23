@@ -17,12 +17,7 @@ const buddhistMerits = [
   MeritItem('evening_chant', 'ทำวัตรเย็น', 'ทบทวนใจในยามค่ำ'),
   MeritItem('precepts5', 'รักษาศีล 5', 'ตั้งใจรักษาศีลในวันนี้'),
   MeritItem('precepts8', 'รักษาศีล 8', 'เพิ่มความสำรวมและเรียบง่าย'),
-  MeritItem(
-    'meditate',
-    'นั่งสมาธิตามจำนวนนาที',
-    'บันทึกเวลาที่ฝึกในวันนี้',
-    supportsMinutes: true,
-  ),
+  MeritItem('meditate','นั่งสมาธิ','ฝึกจิตวันนี้',),
   MeritItem('cleaning', 'ทำความสะอาด', 'ดูแลพื้นที่และสิ่งรอบตัว'),
   MeritItem('dharma', 'ฟังธรรม', 'เปิดใจเรียนรู้ธรรมะ'),
 ];

@@ -28,6 +28,8 @@ class _MeritTrackingScreenState extends State<MeritTrackingScreen> {
   late String _thaiTime;
   Timer? _dateRefreshTimer;
 
+  // แปลงเวลาปัจจุบันของเครื่องเป็นเวลาไทย UTC+7
+  // เพื่อไม่ขึ้นกับ timezone ของ Android Emulator
   DateTime _thaiNow() {
     return DateTime.now().toUtc().add(const Duration(hours: 7));
   }
@@ -51,11 +53,17 @@ class _MeritTrackingScreenState extends State<MeritTrackingScreen> {
   @override
   void initState() {
     super.initState();
+
+    // กำหนดวันที่และเวลาเริ่มต้นเมื่อเปิดหน้า
     _todayDate = _currentDate();
     _thaiTime = _currentTime();
+
+    // ตรวจสอบเวลาใหม่ทุก 1 นาที
+    // เพื่อให้วันที่เปลี่ยนอัตโนมัติเมื่อข้ามเที่ยงคืน
     _dateRefreshTimer = Timer.periodic(const Duration(minutes: 1), (_) {
       final currentDate = _currentDate();
       final currentTime = _currentTime();
+
       if (mounted && (currentDate != _todayDate || currentTime != _thaiTime)) {
         setState(() {
           _todayDate = currentDate;
@@ -63,34 +71,49 @@ class _MeritTrackingScreenState extends State<MeritTrackingScreen> {
         });
       }
     });
+
+    // โหลดแต้มรวมและประวัติจากฐานข้อมูล
     _loadAccountData();
   }
 
   @override
   void dispose() {
+    // ยกเลิก Timer เพื่อป้องกันการใช้ทรัพยากรค้าง
     _dateRefreshTimer?.cancel();
     super.dispose();
   }
 
   Future<void> _loadAccountData() async {
     try {
+      // ดึงแต้มสะสมและประวัติของผู้ใช้จาก PHP API
       final summary = await ApiService.getSummary(username: widget.username);
       final history = await ApiService.getHistory(username: widget.username);
+
+      // ตรวจสอบว่าหน้ายังเปิดอยู่ก่อนเรียก setState
       if (!mounted) return;
+
       setState(() {
         _totalPoints = (summary['total_points'] as num?)?.toInt() ?? 0;
         _history = history;
       });
     } catch (_) {
-      // The tracker remains usable while the API is being configured.
+      // หาก API ยังไม่พร้อม แอปยังสามารถเลือกกิจกรรมได้ตามปกติ
     }
   }
 
   void _toggleItem(String itemId, bool isChecked) {
     setState(() {
       if (isChecked) {
+        // ศีล 5 และศีล 8 เลือกได้เพียงอย่างใดอย่างหนึ่ง
+        if (itemId == 'sila_5') {
+          _selectedIds.remove('sila_8');
+        } else if (itemId == 'sila_8') {
+          _selectedIds.remove('sila_5');
+        }
+
         _selectedIds.add(itemId);
       } else {
+        // ยกเลิกกิจกรรมที่เลือก
         _selectedIds.remove(itemId);
         _minuteValues.remove(itemId);
       }
@@ -98,6 +121,7 @@ class _MeritTrackingScreenState extends State<MeritTrackingScreen> {
   }
 
   Future<void> _saveLog() async {
+    // ห้ามบันทึกถ้ายังไม่ได้เลือกกิจกรรม
     if (_selectedIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -110,13 +134,17 @@ class _MeritTrackingScreenState extends State<MeritTrackingScreen> {
     setState(() => _isSaving = true);
 
     try {
+      // แปลงรายการที่เลือกเป็นข้อมูลสำหรับส่งให้ API
+      // ค่า 1 หมายถึงกิจกรรมนั้นนับเป็น 1 แต้ม
       final activities = <String, int>{};
+
       for (final item in _items) {
         if (_selectedIds.contains(item.id)) {
           activities[item.id] = _minuteValues[item.id] ?? 1;
         }
       }
 
+      // บันทึกกิจกรรมของผู้ใช้ในวันที่ปัจจุบัน
       await ApiService.saveDailyLog(
         username: widget.username,
         religion: widget.religion,
@@ -126,17 +154,21 @@ class _MeritTrackingScreenState extends State<MeritTrackingScreen> {
 
       if (!mounted) return;
 
+      // โหลดแต้มรวมและประวัติใหม่หลังบันทึกสำเร็จ
       await _loadAccountData();
 
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('บันทึกข้อมูลสำเร็จ')));
     } catch (error) {
+      // แสดงข้อความเมื่อบันทึกไม่สำเร็จ
       if (!mounted) return;
+
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(error.toString())));
     } finally {
+      // เปิดปุ่มบันทึกกลับหลังจากการทำงานเสร็จ
       if (mounted) {
         setState(() => _isSaving = false);
       }
@@ -205,28 +237,10 @@ class _MeritTrackingScreenState extends State<MeritTrackingScreen> {
                             value: isChecked,
                             title: Text(item.title),
                             subtitle: Text(item.subtitle),
-                            onChanged: (value) =>
-                                _toggleItem(item.id, value ?? false),
+                            onChanged: (value) {
+                              _toggleItem(item.id, value ?? false);
+                            },
                           ),
-                          if (item.supportsMinutes && isChecked)
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                              child: TextFormField(
-                                initialValue: (_minuteValues[item.id] ?? 20)
-                                    .toString(),
-                                keyboardType: TextInputType.number,
-                                decoration: const InputDecoration(
-                                  labelText: 'นาที',
-                                  border: OutlineInputBorder(),
-                                ),
-                                onChanged: (value) {
-                                  final minutes = int.tryParse(value) ?? 0;
-                                  setState(
-                                    () => _minuteValues[item.id] = minutes,
-                                  );
-                                },
-                              ),
-                            ),
                         ],
                       ),
                     ),
@@ -268,6 +282,7 @@ class _MeritTrackingScreenState extends State<MeritTrackingScreen> {
   }
 
   void _showHistory(BuildContext context) {
+    // แสดงประวัติใน Bottom Sheet โดยไม่เปลี่ยนหน้า
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,

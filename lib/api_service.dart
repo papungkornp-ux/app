@@ -3,9 +3,11 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ApiService {
-  // Android Emulator maps 10.0.2.2 to the host computer's localhost.
+  // Android Emulator ใช้ 10.0.2.2 แทน localhost ของคอมพิวเตอร์
   static const String baseUrl = 'http://10.0.2.2/merit_api';
 
+  // เมธอดกลางสำหรับส่งข้อมูลแบบ POST ไปยัง PHP API
+  // ทุกคำสั่ง เช่น login, register และบันทึกกิจกรรมจะใช้เมธอดนี้
   static Future<Map<String, dynamic>> _post(
     Map<String, dynamic> payload,
   ) async {
@@ -15,11 +17,16 @@ class ApiService {
       body: jsonEncode(payload),
     );
 
+    // ตรวจสอบ HTTP status code ก่อนอ่านข้อมูล
     if (response.statusCode >= 400) {
       throw Exception('เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ');
     }
 
+    // แปลง JSON ที่ PHP ส่งกลับมาเป็น Map
     final body = jsonDecode(response.body);
+
+    // API ต้องส่ง success: true กลับมา
+    // หากไม่สำเร็จ จะนำข้อความจากเซิร์ฟเวอร์มาแสดง
     if (body is! Map<String, dynamic> || body['success'] != true) {
       throw Exception(
         body is Map
@@ -27,9 +34,11 @@ class ApiService {
             : 'ดำเนินการไม่สำเร็จ',
       );
     }
+
     return body;
   }
 
+  // ส่งชื่อผู้ใช้และรหัสผ่านไปตรวจสอบกับเซิร์ฟเวอร์
   static Future<Map<String, dynamic>> login({
     required String username,
     required String password,
@@ -41,6 +50,7 @@ class ApiService {
     });
   }
 
+  // สร้างบัญชีใหม่ โดยบันทึกชื่อผู้ใช้ รหัสผ่าน และศาสนา
   static Future<void> register({
     required String username,
     required String password,
@@ -54,6 +64,8 @@ class ApiService {
     });
   }
 
+  // บันทึกกิจกรรมประจำวันที่ผู้ใช้เลือก
+  // activities จะเก็บรหัสกิจกรรมและค่าคะแนนของกิจกรรมนั้น
   static Future<void> saveDailyLog({
     required String username,
     required String religion,
@@ -69,12 +81,20 @@ class ApiService {
     });
   }
 
-  static Future<Map<String, dynamic>> getSummary({required String username}) {
+  // ขอข้อมูลแต้มรวมของผู้ใช้จากเซิร์ฟเวอร์
+  static Future<Map<String, dynamic>> getSummary({
+    required String username,
+  }) {
     return _post({'action': 'summary', 'username': username});
   }
 
-  static Future<List<dynamic>> getHistory({required String username}) async {
+  // ขอประวัติการบันทึก แล้วคืนเฉพาะรายการ history
+  static Future<List<dynamic>> getHistory({
+    required String username,
+  }) async {
     final result = await _post({'action': 'history', 'username': username});
+
+    // หากไม่มี history ให้คืน List ว่างแทน null
     return result['history'] as List<dynamic>? ?? <dynamic>[];
   }
 }

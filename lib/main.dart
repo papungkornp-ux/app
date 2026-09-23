@@ -46,22 +46,30 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _login() async {
     final username = _usernameController.text.trim();
     final password = _passwordController.text;
+
+    // ตรวจสอบข้อมูลก่อนส่งไปยัง API
     if (username.isEmpty || password.isEmpty) {
       _showMessage('กรุณากรอกชื่อผู้ใช้และรหัสผ่าน');
       return;
     }
 
     setState(() => _isLoading = true);
+
     try {
+      // เรียก API เพื่อตรวจสอบชื่อผู้ใช้และรหัสผ่าน
       final result = await ApiService.login(
         username: username,
         password: password,
       );
+
       if (!mounted) return;
+
+      // ใช้ศาสนาที่ได้จากฐานข้อมูล
       _openTracker(username, result['religion'] as String? ?? _religion);
     } catch (error) {
       if (mounted) _showMessage(error.toString());
     } finally {
+      // เปิดปุ่มกลับหลังจาก API ทำงานเสร็จ
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -83,10 +91,12 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _openRegister() async {
+    // เปิดหน้าสร้างบัญชีและรอผลลัพธ์ true เมื่อสร้างสำเร็จ
     final registered = await Navigator.push<bool>(
       context,
       MaterialPageRoute(builder: (_) => const RegisterScreen()),
     );
+
     if (registered == true && mounted) {
       _showMessage('สร้างบัญชีสำเร็จ กรุณาเข้าสู่ระบบ');
     }
@@ -206,6 +216,7 @@ class _LoginScreenState extends State<LoginScreen> {
 class GroupMembersScreen extends StatelessWidget {
   const GroupMembersScreen({super.key});
 
+  // รายชื่อสมาชิกกลุ่มและรหัสนิสิต
   static const members = [
     ('นายปภังกร ผาทอง', '6721652323'),
     ('นายอัครชัย ทองสุพรรณ์', '6721652846'),
@@ -262,22 +273,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Future<void> _register() async {
     final username = _usernameController.text.trim();
     final password = _passwordController.text;
+
+    // ตรวจสอบชื่อผู้ใช้และความยาวรหัสผ่าน
     if (username.isEmpty || password.length < 4) {
       _showMessage('กรุณากรอกชื่อผู้ใช้และรหัสผ่านอย่างน้อย 4 ตัวอักษร');
       return;
     }
+
+    // ป้องกันการสร้างบัญชีด้วยรหัสผ่านที่ยืนยันไม่ตรงกัน
     if (password != _confirmController.text) {
       _showMessage('รหัสผ่านไม่ตรงกัน');
       return;
     }
 
     setState(() => _isLoading = true);
+
     try {
+      // ส่งข้อมูลบัญชีใหม่ไปบันทึกในฐานข้อมูลผ่าน API
       await ApiService.register(
         username: username,
         password: password,
         religion: _religion,
       );
+
+      // ส่งค่า true กลับไปยังหน้า Login เพื่อแจ้งว่าสร้างบัญชีสำเร็จ
       if (mounted) Navigator.pop(context, true);
     } catch (error) {
       if (mounted) _showMessage(error.toString());
